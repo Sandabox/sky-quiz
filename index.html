@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sky × Anomalo — Data Quality Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─── TOKENS ─────────────────────────────────────── */
+:root {
+  --sky:        #0072C9;
+  --sky-lt:     #E6F1FB;
+  --ano:        #534AB7;
+  --ano-lt:     #EEEDFE;
+  --ok:         #1D9E75;
+  --ok-lt:      #E1F5EE;
+  --err:        #D85A30;
+  --err-lt:     #FAECE7;
+  --gold:       #BA7517;
+  --gold-lt:    #FAEEDA;
+  --bg:         #F7F7F5;
+  --surface:    #FFFFFF;
+  --border:     #E4E4E0;
+  --text:       #1A1A18;
+  --text-2:     #6B6B65;
+  --radius:     10px;
+  --shadow:     0 1px 3px rgba(0,0,0,.07), 0 4px 12px rgba(0,0,0,.05);
+}
+
+/* ─── RESET ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px 60px;
+}
+
+/* ─── CARD ───────────────────────────────────────── */
+.card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* ─── HEADER BAND ────────────────────────────────── */
+.band {
+  background: linear-gradient(135deg, var(--sky) 0%, var(--ano) 100%);
+  padding: 20px 24px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.band-logo {
+  display: flex; align-items: center; gap: 8px;
+}
+.band-pill {
+  font-size: 12px; font-weight: 600; letter-spacing: .03em;
+  padding: 3px 10px; border-radius: 20px;
+  background: rgba(255,255,255,.22); color: #fff;
+}
+.band-x { color: rgba(255,255,255,.5); font-size: 14px; }
+.band-title {
+  margin-left: auto;
+  font-size: 12px; color: rgba(255,255,255,.7);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ─── BODY ───────────────────────────────────────── */
+.body { padding: 24px; }
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ─── TYPOGRAPHY ─────────────────────────────────── */
+h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+.sub { font-size: 14px; color: var(--text-2); margin-bottom: 20px; }
+
+/* ─── NOTICE ─────────────────────────────────────── */
+.notice {
+  padding: 14px 16px; border-radius: var(--radius);
+  border: 1px dashed var(--border);
+  font-size: 14px; color: var(--text-2);
+  text-align: center; margin-bottom: 20px;
+}
+.session-active-badge {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-radius: var(--radius);
+  background: var(--ano-lt); border: 1px solid var(--ano);
+  font-size: 13px; font-weight: 500; color: var(--ano);
+  margin-bottom: 20px;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ano); flex-shrink: 0; animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* ─── FORM ELEMENTS ──────────────────────────────── */
+label { font-size: 13px; font-weight: 500; color: var(--text-2); display: block; margin-bottom: 6px; }
+input[type=text], input[type=password] {
+  width: 100%; padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: inherit; font-size: 15px; color: var(--text);
+  background: var(--bg); outline: none;
+  transition: border-color .15s;
+}
+input:focus { border-color: var(--ano); }
+.field { margin-bottom: 16px; }
+
+/* ─── TOGGLE ─────────────────────────────────────── */
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; background: var(--bg); border-radius: var(--radius);
+  border: 1px solid var(--border); margin-bottom: 20px;
+  font-size: 14px;
+}
+.switch { position: relative; width: 36px; height: 20px; display: inline-block; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; inset: 0; border-radius: 20px;
+  background: var(--border); transition: .2s; cursor: pointer;
+}
+.slider:before {
+  content: ''; position: absolute; width: 14px; height: 14px;
+  border-radius: 50%; background: #fff; left: 3px; bottom: 3px; transition: .2s;
+}
+input:checked + .slider { background: var(--ano); }
+input:checked + .slider:before { transform: translateX(16px); }
+
+/* ─── BUTTONS ────────────────────────────────────── */
+.btn {
+  width: 100%; padding: 12px 16px; border: none; border-radius: var(--radius);
+  font-family: inherit; font-size: 15px; font-weight: 500;
+  cursor: pointer; transition: opacity .15s, transform .1s;
+}
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .35; cursor: default; }
+.btn-primary { background: var(--ano); color: #fff; }
+.btn-primary:hover:not(:disabled) { opacity: .88; }
+.btn-ghost {
+  background: none; border: 1px solid var(--border); color: var(--text-2);
+  font-size: 13px; padding: 8px 14px; width: auto;
+  display: block; margin: 16px auto 0;
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--text-2); }
+.btn-danger { background: var(--err-lt); color: var(--err); border: 1px solid var(--err); font-size: 13px; padding: 9px 14px; width: auto; }
+
+/* ─── PROGRESS ───────────────────────────────────── */
+.prog-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-bottom: 20px; }
+.prog-fill { height: 100%; background: var(--ano); border-radius: 2px; transition: width .35s ease; }
+
+/* ─── QUESTION ───────────────────────────────────── */
+.q-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.q-num { font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text-2); }
+.timer-badge {
+  font-size: 12px; font-weight: 500; font-family: 'DM Mono', monospace;
+  padding: 3px 9px; border-radius: 20px;
+  background: var(--sky-lt); color: var(--sky); transition: background .3s, color .3s;
+}
+.timer-badge.warn { background: var(--gold-lt); color: var(--gold); }
+.timer-badge.danger { background: var(--err-lt); color: var(--err); }
+.q-tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ano); margin-bottom: 6px; }
+.q-text { font-size: 16px; font-weight: 500; line-height: 1.55; margin-bottom: 16px; }
+
+/* ─── OPTIONS ────────────────────────────────────── */
+.opt {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 11px 14px; margin-bottom: 8px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); cursor: pointer;
+  font-family: inherit; font-size: 14px; text-align: left; color: var(--text);
+  transition: background .1s, border-color .1s; line-height: 1.4;
+}
+.opt:hover:not(:disabled) { background: var(--ano-lt); border-color: var(--ano); }
+.opt:disabled { cursor: default; }
+.opt-key {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--border); display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; color: var(--text-2); font-family: 'DM Mono', monospace;
+}
+.opt.correct { background: var(--ok-lt); border-color: var(--ok); }
+.opt.correct .opt-key { background: var(--ok); color: #fff; }
+.opt.wrong { background: var(--err-lt); border-color: var(--err); }
+.opt.wrong .opt-key { background: var(--err); color: #fff; }
+
+.next-btn {
+  width: 100%; margin-top: 8px; padding: 11px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); font-family: inherit;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  color: var(--text); display: none; transition: background .15s;
+}
+.next-btn.show { display: block; }
+.next-btn:hover { background: var(--ano-lt); color: var(--ano); border-color: var(--ano); }
+
+/* ─── SCORE CARD ─────────────────────────────────── */
+.score-card { background: var(--bg); border-radius: var(--radius); padding: 24px; text-align: center; margin-bottom: 16px; }
+.score-num { font-size: 52px; font-weight: 600; color: var(--ano); line-height: 1; }
+.score-denom { font-size: 14px; color: var(--text-2); margin-top: 4px; }
+.score-msg { font-size: 14px; color: var(--text-2); text-align: center; margin-bottom: 20px; }
+
+/* ─── LEADERBOARD ────────────────────────────────── */
+.lb { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+.lb th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: left; }
+.lb td { padding: 9px 8px; font-size: 14px; border-bottom: 1px solid var(--border); }
+.lb tr.top td { background: var(--gold-lt); }
+.rank { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; font-weight: 600; font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text-2); }
+.rank.g { background: var(--gold-lt); color: var(--gold); }
+.rank.s { background: #F0EEEA; color: #555; }
+.rank.b { background: var(--err-lt); color: #993C1D; }
+
+/* ─── ADMIN SESSION GRID ─────────────────────────── */
+.sess-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 8px; margin-bottom: 20px; }
+.sess-btn {
+  padding: 9px 10px; border: 1px solid var(--border); background: var(--bg);
+  border-radius: var(--radius); font-family: inherit; font-size: 12px;
+  font-weight: 500; cursor: pointer; color: var(--text); text-align: center;
+  transition: all .15s; line-height: 1.3;
+}
+.sess-btn:hover { background: var(--ano-lt); border-color: var(--ano); color: var(--ano); }
+.sess-btn.on { background: var(--ano-lt); border-color: var(--ano); color: var(--ano); }
+
+/* ─── SECTION LABEL ──────────────────────────────── */
+.sec { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-2); margin-bottom: 10px; }
+
+/* ─── DIVIDER ────────────────────────────────────── */
+.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ─── ADMIN CONTROLS ROW ─────────────────────────── */
+.ctrl-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.ctrl-row select {
+  flex: 1; min-width: 160px; padding: 9px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: inherit; font-size: 13px; background: var(--bg); color: var(--text);
+}
+
+/* ─── EMPTY STATE ────────────────────────────────── */
+.empty { text-align: center; padding: 24px; color: var(--text-2); font-size: 14px; border: 1px dashed var(--border); border-radius: var(--radius); }
+
+/* ─── ERROR TEXT ─────────────────────────────────── */
+.err-msg { font-size: 13px; color: var(--err); margin-bottom: 12px; display: none; }
+
+/* ─── SPINNER ────────────────────────────────────── */
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── STATUS CHIP ────────────────────────────────── */
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 20px; }
+.chip.ok { background: var(--ok-lt); color: var(--ok); }
+.chip.err { background: var(--err-lt); color: var(--err); }
+.chip.pending { background: var(--gold-lt); color: var(--gold); }
+
+@media (max-width: 420px) {
+  body { padding: 0; }
+  .card { border-radius: 0; min-height: 100vh; box-shadow: none; }
+}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- BAND -->
+  <div class="band">
+    <div class="band-logo">
+      <span class="band-pill">Sky</span>
+      <span class="band-x">×</span>
+      <span class="band-pill">Anomalo</span>
+    </div>
+    <span class="band-title">Data Quality Quiz</span>
+  </div>
+
+  <div class="body">
+
+    <!-- ══════════════════ HOME ══════════════════ -->
+    <div id="s-home" class="screen active">
+      <h1>Data Quality Quiz</h1>
+      <p class="sub">Onsite Training · June 2026</p>
+
+      <div id="no-session" class="notice" style="display:none">
+        ⏳ Waiting for the facilitator to open this session.
+      </div>
+
+      <div id="active-badge" class="session-active-badge" style="display:none">
+        <span class="dot"></span>
+        <span id="active-label"></span>
+      </div>
+
+      <div id="home-form" style="display:none">
+        <div class="field">
+          <label for="name-in">Your name</label>
+          <input type="text" id="name-in" placeholder="e.g. Sarah Jones" maxlength="40" />
+        </div>
+        <div class="toggle-row">
+          <span>5-minute countdown timer</span>
+          <label class="switch">
+            <input type="checkbox" id="timer-tog" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <button class="btn btn-primary" id="start-btn" disabled onclick="startQuiz()">Start quiz</button>
+      </div>
+
+      <hr class="divider">
+      <button class="btn btn-ghost" onclick="showScreen('s-pin')">Facilitator view →</button>
+    </div>
+
+    <!-- ══════════════════ PIN ══════════════════ -->
+    <div id="s-pin" class="screen">
+      <h1>Facilitator login</h1>
+      <p class="sub">Enter your PIN to manage sessions</p>
+      <div class="field">
+        <label for="pin-in">PIN</label>
+        <input type="password" id="pin-in" placeholder="Enter PIN" maxlength="10" autocomplete="off" />
+      </div>
+      <p class="err-msg" id="pin-err">Incorrect PIN — try again.</p>
+      <button class="btn btn-primary" onclick="checkPin()">Enter</button>
+      <button class="btn btn-ghost" onclick="showScreen('s-home')">← Back</button>
+    </div>
+
+    <!-- ══════════════════ ADMIN ══════════════════ -->
+    <div id="s-admin" class="screen">
+      <h1>Facilitator view</h1>
+      <p class="sub">Select the active session, then participants can start.</p>
+
+      <div class="sec">Active session</div>
+      <div class="sess-grid" id="sess-grid"></div>
+
+      <div class="toggle-row">
+        <span>5-minute countdown timer</span>
+        <label class="switch">
+          <input type="checkbox" id="admin-timer-tog" checked onchange="saveTimerPref()">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <hr class="divider">
+
+      <div class="sec">Leaderboard</div>
+      <div class="ctrl-row">
+        <select id="lb-filter" onchange="loadLeaderboard()">
+          <option value="">All sessions</option>
+        </select>
+        <button class="btn btn-danger" onclick="clearScores()">Clear</button>
+      </div>
+      <div id="lb-wrap"></div>
+      <button class="btn btn-ghost" style="margin-top:4px" onclick="loadLeaderboard()">↺ Refresh</button>
+
+      <hr class="divider">
+      <button class="btn btn-ghost" onclick="showScreen('s-home')">← Back to quiz</button>
+    </div>
+
+    <!-- ══════════════════ QUIZ ══════════════════ -->
+    <div id="s-quiz" class="screen">
+      <div class="prog-wrap"><div class="prog-fill" id="prog"></div></div>
+      <div class="q-meta">
+        <span class="q-num" id="q-num"></span>
+        <span class="timer-badge" id="timer-badge" style="display:none"></span>
+      </div>
+      <p class="q-tag" id="q-tag"></p>
+      <p class="q-text" id="q-text"></p>
+      <div id="opts"></div>
+      <button class="next-btn" id="next-btn" onclick="advance()"></button>
+    </div>
+
+    <!-- ══════════════════ RESULT ══════════════════ -->
+    <div id="s-result" class="screen">
+      <h1>Quiz complete!</h1>
+      <p class="sub" id="res-sub"></p>
+      <div class="score-card">
+        <div class="score-num" id="res-num"></div>
+        <div class="score-denom">correct answers</div>
+      </div>
+      <p class="score-msg" id="res-msg"></p>
+      <div id="save-status" style="text-align:center;margin-bottom:16px;font-size:13px;color:var(--text-2)"></div>
+      <button class="btn btn-primary" style="background:var(--bg);color:var(--text);border:1px solid var(--border);" onclick="showScreen('s-home')">Back to home</button>
+    </div>
+
+  </div><!-- /body -->
+</div><!-- /card -->
+
+<script>
+// ─────────────────────────────────────────────────────────
+// CONFIGURATION — update these before going live
+// ─────────────────────────────────────────────────────────
+const CONFIG = {
+  PIN: "sky1234",                    // Change this!
+  SHEET_URL: "https://script.google.com/macros/s/AKfycbxLpVyiZ2px9upM0SHOBFiZqqWjLfk_vRHgzX4J0bGz4nAByBejEbXRhyqrKS0Brw0/exec", // Paste your Apps Script Web App URL here
+};
+
+// ─────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────
+const SESSIONS = [
+  "Osterley – Session 1 (9:15)",  "Osterley – Session 2 (10:15)",
+  "Osterley – Session 3 (11:30)", "Osterley – Session 4 (12:30)",
+  "Osterley – Session 5 (14:00)", "Osterley – Session 6 (15:00)",
+  "Watermark – Session 1 (9:30)", "Watermark – Session 2 (10:30)",
+  "Watermark – Session 3 (11:30)","Watermark – Session 4 (13:30)",
+  "Watermark – Session 5 Advanced (14:30)"
+];
+
+const QUESTIONS = [
+  { tag:"What is Anomalo", q:"What is the primary purpose of Anomalo at Sky?", opts:["Managing data pipelines and ETL workflows","Detecting and monitoring data quality issues","Storing and archiving large datasets","Visualising business intelligence dashboards"], ans:1 },
+  { tag:"Understanding your data", q:"Which Anomalo feature helps you understand a table by answering questions about it in natural language?", opts:["Lineage","Validation Rules","Aida","Key Metrics"], ans:2 },
+  { tag:"Understanding your data", q:"What does the Insights Agent do?", opts:["Writes SQL checks automatically","Proactively analyses data quality results and surfaces interesting findings","Sends Slack alerts when a check fails","Generates ERD diagrams of your schema"], ans:1 },
+  { tag:"Building checks", q:"What is the difference between a Validation Rule and a Key Metric in Anomalo?", opts:["Validation Rules run on a schedule; Key Metrics run manually","Validation Rules test specific conditions (e.g. no nulls); Key Metrics track numeric values over time","Validation Rules use SQL; Key Metrics use Python","There is no difference — they are the same thing"], ans:1 },
+  { tag:"Building checks", q:"Which of the following best describes a custom SQL check in Anomalo?", opts:["A check that runs only in the production environment","A check written in natural language and executed by Aida","A check where you write your own SQL query to define the quality rule","A check that is pre-configured by Anomalo automatically"], ans:2 },
+  { tag:"Building checks", q:"When Aida helps you build a data quality check, what does it use to generate the check?", opts:["Pre-built templates from the Anomalo library","Natural language descriptions you provide","A drag-and-drop UI with no coding required","Automated sampling of your table"], ans:1 },
+  { tag:"Investigating failures", q:"A data quality check has just failed. What is the recommended first step in Anomalo?", opts:["Immediately delete and recreate the check","Use Aida to interrogate the failure and understand what went wrong","Disable all alerts until the issue is resolved","Contact the Anomalo support team"], ans:1 },
+  { tag:"Investigating failures", q:"What can you set up in Anomalo to be notified when a data quality issue occurs?", opts:["A cron job in your cloud environment","Alerts and notification channels inside Anomalo","A webhook to your GitHub repository","An email to the Anomalo support team"], ans:1 },
+  { tag:"Data documentation", q:"What does the Documentation Agent in Anomalo do?", opts:["Generates PDF reports of check results","Scans unstructured sources to build data documentation and give the AI more context about your data","Automatically writes Confluence pages about failed checks","Creates a data dictionary from your SQL queries"], ans:1 },
+  { tag:"Anomalo at Sky", q:"You notice a table has started receiving significantly fewer records than usual. What is the best first step using Anomalo?", opts:["Raise an urgent ticket with your data engineering team","Ask Aida to investigate the table and explain what might have changed","Delete the affected checks and rebuild them from scratch","Wait 24 hours to see if the issue resolves itself"], ans:1 }
+];
+
+// ─────────────────────────────────────────────────────────
+// LOCAL STORAGE KEYS
+// ─────────────────────────────────────────────────────────
+const LS = { SESSION: "ano_session", TIMER: "ano_timer" };
+
+// ─────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────
+let quiz = { qs: [], idx: 0, score: 0, answered: false, timerVal: 300, timerInt: null, name: "" };
+
+// ─────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────
+function shuffle(a){ let arr=[...a]; for(let i=arr.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];} return arr; }
+function getSession(){ return localStorage.getItem(LS.SESSION)||""; }
+function setSession(s){ localStorage.setItem(LS.SESSION,s); }
+function getTimer(){ const v=localStorage.getItem(LS.TIMER); return v===null?true:v==="true"; }
+function setTimer(v){ localStorage.setItem(LS.TIMER,String(v)); }
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==='s-home') refreshHome();
+  if(id==='s-admin') initAdmin();
+}
+
+// ─────────────────────────────────────────────────────────
+// HOME
+// ─────────────────────────────────────────────────────────
+function refreshHome(){
+  const s = getSession();
+  document.getElementById('no-session').style.display   = s ? 'none' : 'block';
+  document.getElementById('active-badge').style.display = s ? 'flex'  : 'none';
+  document.getElementById('home-form').style.display    = s ? 'block' : 'none';
+  if(s) document.getElementById('active-label').textContent = s;
+  document.getElementById('timer-tog').checked = getTimer();
+  checkReady();
+}
+function checkReady(){
+  const name = document.getElementById('name-in').value.trim();
+  document.getElementById('start-btn').disabled = !(name && getSession());
+}
+document.getElementById('name-in').addEventListener('input', checkReady);
+
+// ─────────────────────────────────────────────────────────
+// PIN
+// ─────────────────────────────────────────────────────────
+function checkPin(){
+  const v = document.getElementById('pin-in').value.trim();
+  if(v === CONFIG.PIN){
+    document.getElementById('pin-err').style.display='none';
+    document.getElementById('pin-in').value='';
+    showScreen('s-admin');
+  } else {
+    document.getElementById('pin-err').style.display='block';
+  }
+}
+document.getElementById('pin-in').addEventListener('keydown',e=>{ if(e.key==='Enter') checkPin(); });
+
+// ─────────────────────────────────────────────────────────
+// ADMIN
+// ─────────────────────────────────────────────────────────
+function initAdmin(){
+  buildSessGrid();
+  buildLbFilter();
+  document.getElementById('admin-timer-tog').checked = getTimer();
+  loadLeaderboard();
+}
+function saveTimerPref(){ setTimer(document.getElementById('admin-timer-tog').checked); }
+
+function buildSessGrid(){
+  const grid = document.getElementById('sess-grid');
+  grid.innerHTML='';
+  const active = getSession();
+  SESSIONS.forEach(s=>{
+    const b = document.createElement('button');
+    b.className = 'sess-btn' + (s===active?' on':'');
+    b.textContent = s;
+    b.onclick = ()=>{
+      const cur = getSession();
+      setSession(cur===s ? '' : s);
+      buildSessGrid();
+      buildLbFilter();
+      if(cur!==s){
+        document.getElementById('lb-filter').value = s;
+        loadLeaderboard();
+      }
+    };
+    grid.appendChild(b);
+  });
+}
+
+function buildLbFilter(){
+  const sel = document.getElementById('lb-filter');
+  const cur = sel.value;
+  sel.innerHTML='<option value="">All sessions</option>';
+  SESSIONS.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
+  if(cur) sel.value=cur;
+}
+
+async function loadLeaderboard(){
+  const wrap = document.getElementById('lb-wrap');
+  const session = document.getElementById('lb-filter').value;
+  if(CONFIG.SHEET_URL === 'YOUR_APPS_SCRIPT_URL'){
+    wrap.innerHTML='<div class="empty">📋 Connect Google Sheets to see scores here.<br><small>See setup guide in the README.</small></div>';
+    return;
+  }
+  wrap.innerHTML='<div class="empty"><span class="spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--ano)"></span> Loading…</div>';
+  try {
+    const url = CONFIG.SHEET_URL + '?action=get' + (session?'&session='+encodeURIComponent(session):'');
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data.length){ wrap.innerHTML='<div class="empty">No submissions yet.</div>'; return; }
+    renderLb(data, !session, wrap);
+  } catch(e){
+    wrap.innerHTML='<div class="empty chip err">⚠ Could not load scores. Check your Sheet URL.</div>';
+  }
+}
+
+function renderLb(rows, showSession, wrap){
+  const rankClass = i => i===0?'g':i===1?'s':i===2?'b':'';
+  let h = '<table class="lb"><thead><tr><th>Rank</th><th>Name</th>';
+  if(showSession) h+='<th>Session</th>';
+  h+='<th style="text-align:right">Score</th></tr></thead><tbody>';
+  rows.forEach((r,i)=>{
+    h+=`<tr class="${i===0?'top':''}"><td><span class="rank ${rankClass(i)}">${i+1}</span></td>`;
+    h+=`<td>${r.name}${i===0?' 🏆':''}</td>`;
+    if(showSession) h+=`<td style="font-size:12px;color:var(--text-2)">${r.session}</td>`;
+    h+=`<td style="text-align:right;font-weight:500">${r.score}/${r.total}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  wrap.innerHTML=h;
+}
+
+async function clearScores(){
+  const session = document.getElementById('lb-filter').value;
+  if(!confirm('Clear scores for: '+(session||'ALL sessions')+'?')) return;
+  if(CONFIG.SHEET_URL === 'YOUR_APPS_SCRIPT_URL'){ alert('Set up Google Sheets first.'); return; }
+  try {
+    await fetch(CONFIG.SHEET_URL+'?action=clear'+(session?'&session='+encodeURIComponent(session):''));
+    loadLeaderboard();
+  } catch(e){ alert('Error clearing scores.'); }
+}
+
+// ─────────────────────────────────────────────────────────
+// QUIZ
+// ─────────────────────────────────────────────────────────
+function prepQuestions(){
+  return QUESTIONS.map(q=>{
+    const opts = q.opts.map((t,i)=>({t,correct:i===q.ans}));
+    const sh = shuffle(opts);
+    return { tag:q.tag, q:q.q, opts:sh.map(o=>o.t), ans:sh.findIndex(o=>o.correct) };
+  });
+}
+
+function startQuiz(){
+  quiz.name    = document.getElementById('name-in').value.trim();
+  quiz.qs      = prepQuestions();
+  quiz.idx     = 0;
+  quiz.score   = 0;
+  quiz.answered= false;
+  showScreen('s-quiz');
+  renderQ();
+  if(getTimer()) startTimer();
+}
+
+function startTimer(){
+  clearInterval(quiz.timerInt);
+  quiz.timerVal = 300;
+  const badge = document.getElementById('timer-badge');
+  badge.style.display='';
+  tickTimer();
+  quiz.timerInt = setInterval(()=>{
+    quiz.timerVal--;
+    tickTimer();
+    if(quiz.timerVal<=0){ clearInterval(quiz.timerInt); finish(); }
+  },1000);
+}
+function tickTimer(){
+  const badge = document.getElementById('timer-badge');
+  const m=Math.floor(quiz.timerVal/60), s=quiz.timerVal%60;
+  badge.textContent = m+':'+(s<10?'0':'')+s;
+  badge.className='timer-badge'+(quiz.timerVal<=30?' danger':quiz.timerVal<=60?' warn':'');
+}
+
+function renderQ(){
+  const q=quiz.qs[quiz.idx], total=quiz.qs.length;
+  document.getElementById('prog').style.width=((quiz.idx/total)*100)+'%';
+  document.getElementById('q-num').textContent='Question '+(quiz.idx+1)+' of '+total;
+  document.getElementById('q-tag').textContent=q.tag;
+  document.getElementById('q-text').textContent=q.q;
+  quiz.answered=false;
+  const opts=document.getElementById('opts');
+  opts.innerHTML='';
+  ['A','B','C','D'].forEach((k,i)=>{
+    const b=document.createElement('button');
+    b.className='opt';
+    b.innerHTML=`<span class="opt-key">${k}</span><span>${q.opts[i]}</span>`;
+    b.onclick=()=>pick(i,b,q.ans);
+    opts.appendChild(b);
+  });
+  const nb=document.getElementById('next-btn');
+  nb.className='next-btn';
+  nb.textContent=quiz.idx<total-1?'Next question →':'See my score →';
+}
+
+function pick(idx,btn,correct){
+  if(quiz.answered)return;
+  quiz.answered=true;
+  document.querySelectorAll('.opt').forEach(b=>b.disabled=true);
+  if(idx===correct){btn.classList.add('correct');quiz.score++;}
+  else{btn.classList.add('wrong');document.querySelectorAll('.opt')[correct].classList.add('correct');}
+  document.getElementById('next-btn').classList.add('show');
+}
+
+function advance(){
+  if(!quiz.answered)return;
+  quiz.idx++;
+  if(quiz.idx>=quiz.qs.length) finish();
+  else renderQ();
+}
+
+async function finish(){
+  clearInterval(quiz.timerInt);
+  document.getElementById('prog').style.width='100%';
+  const total=quiz.qs.length, score=quiz.score, pct=Math.round(score/total*100);
+  showScreen('s-result');
+  document.getElementById('res-sub').textContent = quiz.name+' · '+getSession();
+  document.getElementById('res-num').textContent = score+'/'+total;
+  document.getElementById('res-msg').textContent = pct===100?'🏆 Perfect score! You nailed it.':pct>=80?'Great work — you clearly paid attention!':pct>=60?'Good effort. There\'s always next time!':'Keep exploring Anomalo — you\'ll get there!';
+  document.getElementById('timer-badge').style.display='none';
+
+  // Post to Google Sheets
+  await postScore({ name:quiz.name, session:getSession(), score, total, ts: new Date().toISOString() });
+}
+
+async function postScore(payload){
+  const el = document.getElementById('save-status');
+  if(CONFIG.SHEET_URL==='YOUR_APPS_SCRIPT_URL'){
+    el.innerHTML='<span class="chip pending">⚠ Scores not connected yet — set up Google Sheets.</span>';
+    return;
+  }
+  el.innerHTML='<span class="spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--ano)"></span> Saving your score…';
+  try {
+    await fetch(CONFIG.SHEET_URL+'?action=post&'+new URLSearchParams(payload));
+    el.innerHTML='<span class="chip ok">✓ Score saved</span>';
+  } catch(e){
+    el.innerHTML='<span class="chip err">⚠ Could not save score — tell your facilitator.</span>';
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────────────────
+refreshHome();
+</script>
+</body>
+</html>
