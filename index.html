@@ -421,28 +421,57 @@ const QUESTIONS = [
 ];
 
 // ─────────────────────────────────────────────────────────
-// LOCAL STORAGE KEYS
+// LOCAL STORAGE
 // ─────────────────────────────────────────────────────────
-const LS = { SESSION: "ano_session", TIMER: "ano_timer" };
+const LS = { TIMER: "ano_timer" };
 
 // ─────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────
 let quiz = { qs: [], idx: 0, score: 0, answered: false, timerVal: 300, timerInt: null, name: "" };
+let activeSession = "";   // fetched from Sheets — shared across all devices
+let pollInt = null;
 
 // ─────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────
 function shuffle(a){ let arr=[...a]; for(let i=arr.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];} return arr; }
-function getSession(){ return localStorage.getItem(LS.SESSION)||""; }
-function setSession(s){ localStorage.setItem(LS.SESSION,s); }
 function getTimer(){ const v=localStorage.getItem(LS.TIMER); return v===null?true:v==="true"; }
 function setTimer(v){ localStorage.setItem(LS.TIMER,String(v)); }
+
+// Fetch active session from Sheets (participants call this every 5s)
+async function fetchActiveSession(){
+  if(CONFIG.SHEET_URL==='YOUR_APPS_SCRIPT_URL') return "";
+  try {
+    const res = await fetch(CONFIG.SHEET_URL+'?action=getSession&_='+Date.now());
+    const data = await res.json();
+    return data.session || "";
+  } catch(e){ return activeSession; }
+}
+
+// Push active session to Sheets (facilitator calls this on click)
+async function pushActiveSession(session){
+  if(CONFIG.SHEET_URL==='YOUR_APPS_SCRIPT_URL') return;
+  try {
+    await fetch(CONFIG.SHEET_URL+'?action=setSession&session='+encodeURIComponent(session));
+  } catch(e){ console.warn('Could not push session', e); }
+}
+
+// Poll every 5 seconds on the home screen
+function startPolling(){
+  stopPolling();
+  pollInt = setInterval(async ()=>{
+    const s = await fetchActiveSession();
+    if(s !== activeSession){ activeSession = s; refreshHome(); }
+  }, 5000);
+}
+function stopPolling(){ clearInterval(pollInt); pollInt = null; }
 
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if(id==='s-home') refreshHome();
+  if(id==='s-home'){ refreshHome(); startPolling(); }
+  else { stopPolling(); }
   if(id==='s-admin') initAdmin();
 }
 
@@ -450,8 +479,8 @@ function showScreen(id){
 // HOME
 // ─────────────────────────────────────────────────────────
 function refreshHome(){
-  const s = getSession();
-  document.getElementById('no-session').style.display   = s ? 'none' : 'block';
+  const s = activeSession;
+  document.getElementById('no-session').style.display   = s ? 'none'  : 'block';
   document.getElementById('active-badge').style.display = s ? 'flex'  : 'none';
   document.getElementById('home-form').style.display    = s ? 'block' : 'none';
   if(s) document.getElementById('active-label').textContent = s;
@@ -460,7 +489,7 @@ function refreshHome(){
 }
 function checkReady(){
   const name = document.getElementById('name-in').value.trim();
-  document.getElementById('start-btn').disabled = !(name && getSession());
+  document.getElementById('start-btn').disabled = !(name && activeSession);
 }
 document.getElementById('name-in').addEventListener('input', checkReady);
 
@@ -482,7 +511,9 @@ document.getElementById('pin-in').addEventListener('keydown',e=>{ if(e.key==='En
 // ─────────────────────────────────────────────────────────
 // ADMIN
 // ─────────────────────────────────────────────────────────
-function initAdmin(){
+async function initAdmin(){
+  // Sync activeSession from Sheets before building grid
+  activeSession = await fetchActiveSession();
   buildSessGrid();
   buildLbFilter();
   document.getElementById('admin-timer-tog').checked = getTimer();
@@ -493,18 +524,18 @@ function saveTimerPref(){ setTimer(document.getElementById('admin-timer-tog').ch
 function buildSessGrid(){
   const grid = document.getElementById('sess-grid');
   grid.innerHTML='';
-  const active = getSession();
   SESSIONS.forEach(s=>{
     const b = document.createElement('button');
-    b.className = 'sess-btn' + (s===active?' on':'');
+    b.className = 'sess-btn' + (s===activeSession?' on':'');
     b.textContent = s;
-    b.onclick = ()=>{
-      const cur = getSession();
-      setSession(cur===s ? '' : s);
+    b.onclick = async ()=>{
+      const next = (activeSession===s) ? '' : s;
+      activeSession = next;
+      await pushActiveSession(next);
       buildSessGrid();
       buildLbFilter();
-      if(cur!==s){
-        document.getElementById('lb-filter').value = s;
+      if(next){
+        document.getElementById('lb-filter').value = next;
         loadLeaderboard();
       }
     };
@@ -647,13 +678,13 @@ async function finish(){
   document.getElementById('prog').style.width='100%';
   const total=quiz.qs.length, score=quiz.score, pct=Math.round(score/total*100);
   showScreen('s-result');
-  document.getElementById('res-sub').textContent = quiz.name+' · '+getSession();
+  document.getElementById('res-sub').textContent = quiz.name+' · '+activeSession;
   document.getElementById('res-num').textContent = score+'/'+total;
   document.getElementById('res-msg').textContent = pct===100?'🏆 Perfect score! You nailed it.':pct>=80?'Great work — you clearly paid attention!':pct>=60?'Good effort. There\'s always next time!':'Keep exploring Anomalo — you\'ll get there!';
   document.getElementById('timer-badge').style.display='none';
 
   // Post to Google Sheets
-  await postScore({ name:quiz.name, session:getSession(), score, total, ts: new Date().toISOString() });
+  await postScore({ name:quiz.name, session:activeSession, score, total, ts: new Date().toISOString() });
 }
 
 async function postScore(payload){
@@ -674,7 +705,7 @@ async function postScore(payload){
 // ─────────────────────────────────────────────────────────
 // BOOT
 // ─────────────────────────────────────────────────────────
-refreshHome();
+(async()=>{ activeSession = await fetchActiveSession(); refreshHome(); startPolling(); })();
 </script>
 </body>
 </html>
