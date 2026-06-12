@@ -298,13 +298,6 @@ input:checked + .slider:before { transform: translateX(16px); }
           <label for="name-in">Your name</label>
           <input type="text" id="name-in" placeholder="e.g. Sarah Jones" maxlength="40" />
         </div>
-        <div class="toggle-row">
-          <span>5-minute countdown timer</span>
-          <label class="switch">
-            <input type="checkbox" id="timer-tog" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
         <button class="btn btn-primary" id="start-btn" disabled onclick="startQuiz()">Start quiz</button>
       </div>
 
@@ -484,7 +477,6 @@ function refreshHome(){
   document.getElementById('active-badge').style.display = s ? 'flex'  : 'none';
   document.getElementById('home-form').style.display    = s ? 'block' : 'none';
   if(s) document.getElementById('active-label').textContent = s;
-  document.getElementById('timer-tog').checked = getTimer();
   checkReady();
 }
 function checkReady(){
