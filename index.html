@@ -205,6 +205,7 @@ input:checked + .slider:before { transform: translateX(16px); }
 .score-card { background: var(--bg); border-radius: var(--radius); padding: 24px; text-align: center; margin-bottom: 16px; }
 .score-num { font-size: 52px; font-weight: 600; color: var(--ano); line-height: 1; }
 .score-denom { font-size: 14px; color: var(--text-2); margin-top: 4px; }
+.score-time { font-size: 13px; color: var(--text-2); margin-top: 8px; font-family: 'DM Mono', monospace; }
 .score-msg { font-size: 14px; color: var(--text-2); text-align: center; margin-bottom: 20px; }
 
 /* ─── LEADERBOARD ────────────────────────────────── */
@@ -216,6 +217,8 @@ input:checked + .slider:before { transform: translateX(16px); }
 .rank.g { background: var(--gold-lt); color: var(--gold); }
 .rank.s { background: #F0EEEA; color: #555; }
 .rank.b { background: var(--err-lt); color: #993C1D; }
+.lb-time { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-2); }
+.lb-time.fast { color: var(--ok); font-weight: 500; }
 
 /* ─── ADMIN SESSION GRID ─────────────────────────── */
 .sess-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 8px; margin-bottom: 20px; }
@@ -370,6 +373,7 @@ input:checked + .slider:before { transform: translateX(16px); }
       <div class="score-card">
         <div class="score-num" id="res-num"></div>
         <div class="score-denom">correct answers</div>
+        <div class="score-time" id="res-time"></div>
       </div>
       <p class="score-msg" id="res-msg"></p>
       <div id="save-status" style="text-align:center;margin-bottom:16px;font-size:13px;color:var(--text-2)"></div>
@@ -384,8 +388,8 @@ input:checked + .slider:before { transform: translateX(16px); }
 // CONFIGURATION — update these before going live
 // ─────────────────────────────────────────────────────────
 const CONFIG = {
-  PIN: "sky1234",                    // Change this!
-  SHEET_URL: "https://script.google.com/macros/s/AKfycbxLpVyiZ2px9upM0SHOBFiZqqWjLfk_vRHgzX4J0bGz4nAByBejEbXRhyqrKS0Brw0/exec", // Paste your Apps Script Web App URL here
+  PIN: "sky1234",
+  SHEET_URL: "https://script.google.com/macros/s/AKfycbxLpVyiZ2px9upM0SHOBFiZqqWjLfk_vRHgzX4J0bGz4nAByBejEbXRhyqrKS0Brw0/exec",
 };
 
 // ─────────────────────────────────────────────────────────
@@ -421,8 +425,8 @@ const LS = { TIMER: "ano_timer" };
 // ─────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────
-let quiz = { qs: [], idx: 0, score: 0, answered: false, timerVal: 300, timerInt: null, name: "" };
-let activeSession = "";   // fetched from Sheets — shared across all devices
+let quiz = { qs: [], idx: 0, score: 0, answered: false, timerVal: 300, timerInt: null, name: "", startTime: null };
+let activeSession = "";
 let pollInt = null;
 
 // ─────────────────────────────────────────────────────────
@@ -432,7 +436,14 @@ function shuffle(a){ let arr=[...a]; for(let i=arr.length-1;i>0;i--){let j=Math.
 function getTimer(){ const v=localStorage.getItem(LS.TIMER); return v===null?true:v==="true"; }
 function setTimer(v){ localStorage.setItem(LS.TIMER,String(v)); }
 
-// Fetch active session from Sheets (participants call this every 5s)
+// Format seconds as m:ss
+function fmtTime(secs){
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// Fetch active session from Sheets
 async function fetchActiveSession(){
   if(CONFIG.SHEET_URL==='YOUR_APPS_SCRIPT_URL') return "";
   try {
@@ -442,7 +453,7 @@ async function fetchActiveSession(){
   } catch(e){ return activeSession; }
 }
 
-// Push active session to Sheets (facilitator calls this on click)
+// Push active session to Sheets
 async function pushActiveSession(session){
   if(CONFIG.SHEET_URL==='YOUR_APPS_SCRIPT_URL') return;
   try {
@@ -504,7 +515,6 @@ document.getElementById('pin-in').addEventListener('keydown',e=>{ if(e.key==='En
 // ADMIN
 // ─────────────────────────────────────────────────────────
 async function initAdmin(){
-  // Sync activeSession from Sheets before building grid
   activeSession = await fetchActiveSession();
   buildSessGrid();
   buildLbFilter();
@@ -556,6 +566,14 @@ async function loadLeaderboard(){
     const res = await fetch(url);
     const data = await res.json();
     if(!data.length){ wrap.innerHTML='<div class="empty">No submissions yet.</div>'; return; }
+    // Sort: highest score first; ties broken by fastest time (lowest timeSecs)
+    data.sort((a,b)=>{
+      const scoreDiff = (b.score/b.total) - (a.score/a.total);
+      if(scoreDiff !== 0) return scoreDiff;
+      const aTime = a.timeSecs != null ? Number(a.timeSecs) : Infinity;
+      const bTime = b.timeSecs != null ? Number(b.timeSecs) : Infinity;
+      return aTime - bTime;
+    });
     renderLb(data, !session, wrap);
   } catch(e){
     wrap.innerHTML='<div class="empty chip err">⚠ Could not load scores. Check your Sheet URL.</div>';
@@ -564,16 +582,27 @@ async function loadLeaderboard(){
 
 function renderLb(rows, showSession, wrap){
   const rankClass = i => i===0?'g':i===1?'s':i===2?'b':'';
+  // Find the fastest time among top-score holders for the ⚡ badge
+  const topScore = rows[0] ? rows[0].score / rows[0].total : 0;
   let h = '<table class="lb"><thead><tr><th>Rank</th><th>Name</th>';
   if(showSession) h+='<th>Session</th>';
-  h+='<th style="text-align:right">Score</th></tr></thead><tbody>';
+  h+='<th style="text-align:right">Score</th><th style="text-align:right">Time</th></tr></thead><tbody>';
   rows.forEach((r,i)=>{
+    const timeSecs = r.timeSecs != null ? Number(r.timeSecs) : null;
+    const timeStr = timeSecs != null ? fmtTime(timeSecs) : '—';
+    // Mark as fast if they're tied at top and won on time
+    const isTiedTop = i > 0 && (r.score/r.total) === topScore;
+    const timeClass = isTiedTop ? 'lb-time fast' : 'lb-time';
     h+=`<tr class="${i===0?'top':''}"><td><span class="rank ${rankClass(i)}">${i+1}</span></td>`;
     h+=`<td>${r.name}${i===0?' 🏆':''}</td>`;
     if(showSession) h+=`<td style="font-size:12px;color:var(--text-2)">${r.session}</td>`;
-    h+=`<td style="text-align:right;font-weight:500">${r.score}/${r.total}</td></tr>`;
+    h+=`<td style="text-align:right;font-weight:500">${r.score}/${r.total}</td>`;
+    h+=`<td style="text-align:right"><span class="${timeClass}">${timeStr}</span></td></tr>`;
   });
   h+='</tbody></table>';
+  // Tie-break note if needed
+  const hasTie = rows.length > 1 && (rows[0].score/rows[0].total) === (rows[1].score/rows[1].total);
+  if(hasTie) h+='<p style="font-size:11px;color:var(--text-2);text-align:right;margin-top:-8px">⚡ Ties broken by fastest time</p>';
   wrap.innerHTML=h;
 }
 
@@ -599,11 +628,12 @@ function prepQuestions(){
 }
 
 function startQuiz(){
-  quiz.name    = document.getElementById('name-in').value.trim();
-  quiz.qs      = prepQuestions();
-  quiz.idx     = 0;
-  quiz.score   = 0;
-  quiz.answered= false;
+  quiz.name     = document.getElementById('name-in').value.trim();
+  quiz.qs       = prepQuestions();
+  quiz.idx      = 0;
+  quiz.score    = 0;
+  quiz.answered = false;
+  quiz.startTime = Date.now();   // ← record start timestamp
   showScreen('s-quiz');
   renderQ();
   if(getTimer()) startTimer();
@@ -668,15 +698,20 @@ function advance(){
 async function finish(){
   clearInterval(quiz.timerInt);
   document.getElementById('prog').style.width='100%';
+
+  // Calculate elapsed time in whole seconds
+  const elapsedSecs = Math.round((Date.now() - quiz.startTime) / 1000);
+
   const total=quiz.qs.length, score=quiz.score, pct=Math.round(score/total*100);
   showScreen('s-result');
   document.getElementById('res-sub').textContent = quiz.name+' · '+activeSession;
   document.getElementById('res-num').textContent = score+'/'+total;
+  document.getElementById('res-time').textContent = '⏱ Completed in ' + fmtTime(elapsedSecs);
   document.getElementById('res-msg').textContent = pct===100?'🏆 Perfect score! You nailed it.':pct>=80?'Great work — you clearly paid attention!':pct>=60?'Good effort. There\'s always next time!':'Keep exploring Anomalo — you\'ll get there!';
   document.getElementById('timer-badge').style.display='none';
 
-  // Post to Google Sheets
-  await postScore({ name:quiz.name, session:activeSession, score, total, ts: new Date().toISOString() });
+  // Post to Google Sheets — include timeSecs
+  await postScore({ name:quiz.name, session:activeSession, score, total, timeSecs: elapsedSecs, ts: new Date().toISOString() });
 }
 
 async function postScore(payload){
